@@ -1,0 +1,121 @@
+-- Blue Lock Rivals: Ultimate Control
+local Rayfield = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Rayfield/main/source'))()
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local LocalPlayer = Players.LocalPlayer
+
+-- Create UI
+local Window = Rayfield:CreateWindow({
+    Name = "BLR Ultimate Control",
+    LoadingTitle = "Loading Your Custom Mods...",
+    ConfigurationSaving = { Enabled = true, FolderName = "BLRCustom" }
+})
+
+-- Settings
+local Settings = {
+    ShotPower = 1500,
+    BallAttractSpeed = 100,
+    InfiniteStamina = true
+}
+
+-- Find ball (supports both names)
+local function FindBall()
+    return workspace:FindFirstChild("Hitbox") or workspace:FindFirstChild("Football") 
+end
+
+-- Infinite Stamina Core
+local function HandleStamina()
+    local args = { 0/0 } -- NaN payload
+    local staminaRE = ReplicatedStorage:FindFirstChild("Packages")
+        and ReplicatedStorage.Packages:FindFirstChild("Knit")
+        and ReplicatedStorage.Packages.Knit:FindFirstChild("Services")
+        and ReplicatedStorage.Packages.Knit.Services:FindFirstChild("StaminaService")
+        and ReplicatedStorage.Packages.Knit.Services.StaminaService:FindFirstChild("RE")
+        and ReplicatedStorage.Packages.Knit.Services.StaminaService.RE:FindFirstChild("DecreaseStamina")
+    
+    if staminaRE then
+        while Settings.InfiniteStamina and task.wait(0.5) do
+            pcall(function()
+                staminaRE:FireServer(unpack(args))
+            end)
+        end
+    end
+end
+
+-- Modified shoot function
+local originalShoot
+originalShoot = hookfunction(ReplicatedStorage.Events.Shoot.InvokeServer, function(...)
+    local ball = FindBall()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    
+    if ball then
+        -- Bring ball closer if too far
+        if root and (ball.Position - root.Position).Magnitude > 20 then
+            local bodyPos = Instance.new("BodyPosition")
+            bodyPos.Position = root.Position + Vector3.new(0, 3, 0)
+            bodyPos.MaxForce = Vector3.new(Settings.BallAttractSpeed, Settings.BallAttractSpeed, Settings.BallAttractSpeed)
+            bodyPos.Parent = ball
+            game:GetService("Debris"):AddItem(bodyPos, 0.5)
+        end
+        
+        -- Apply powerful shot
+        local camera = workspace.CurrentCamera
+        local shootDirection = camera.CFrame.LookVector
+        
+        local bodyVel = Instance.new("BodyVelocity")
+        bodyVel.Velocity = shootDirection * Settings.ShotPower
+        bodyVel.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bodyVel.Parent = ball
+        game:GetService("Debris"):AddItem(bodyVel, 0.1)
+    end
+    
+    return originalShoot(...)
+end)
+
+-- UI Controls
+local MainTab = Window:CreateTab("Main")
+
+MainTab:CreateSection("Ball Control")
+
+MainTab:CreateSlider({
+    Name = "Shot Power",
+    Range = {500, 5000},
+    Increment = 100,
+    Suffix = " power",
+    CurrentValue = 1500,
+    Callback = function(Value)
+        Settings.ShotPower = Value
+    end
+})
+
+MainTab:CreateSlider({
+    Name = "Ball Attract Speed",
+    Range = {50, 1000},
+    Increment = 50,
+    Suffix = " force",
+    CurrentValue = 100,
+    Callback = function(Value)
+        Settings.BallAttractSpeed = Value
+    end
+})
+
+MainTab:CreateToggle({
+    Name = "Infinite Stamina",
+    CurrentValue = true,
+    Callback = function(Value)
+        Settings.InfiniteStamina = Value
+        if Value then
+            coroutine.wrap(HandleStamina)()
+        end
+    end
+})
+
+-- Init
+coroutine.wrap(HandleStamina)()
+Rayfield:Notify({
+    Title = "Custom Mods Active",
+    Content = "Features loaded:\n- Shoot from anywhere\n- Ball attraction\n- Infinite stamina",
+    Duration = 6,
+    Image = 6023426915
+})
